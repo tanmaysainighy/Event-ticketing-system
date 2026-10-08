@@ -1,0 +1,15 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "outputDirectory": "public",
+  "functions": {
+    "api/index.js": { "maxDuration": 30 }
+  },
+  "rewrites": [
+    { "source": "/events/:id", "destination": "/event.html" },
+    { "source": "/success/:id", "destination": "/success.html" },
+    { "source": "/ticket/:id", "destination": "/ticket.html" },
+    { "source": "/organizer", "destination": "/organizer.html" },
+    { "source": "/api/:path*", "destination": "/api/index" }
+  ]
+}
