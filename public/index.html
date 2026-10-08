@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Campus Events — Register</title>
+<meta name="description" content="Browse upcoming campus events and register for a signed QR ticket.">
+<script>(function(){try{var t=localStorage.getItem('ce.theme');if(t)document.documentElement.dataset.theme=t;else if(matchMedia('(prefers-color-scheme: dark)').matches)document.documentElement.dataset.theme='dark';}catch(e){}})();</script>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Cpath d='M8 12a2 2 0 0 0 2-2V9h12v1a2 2 0 0 0 0 4v2a2 2 0 0 0 0 4v1H10v-1a2 2 0 0 0-2-2z' fill='none' stroke='white' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+<main>
+  <section class="hero">
+    <div class="orb a"></div><div class="orb b"></div><div class="orb c"></div>
+    <div class="container">
+      <div class="eyebrow">Upcoming on campus</div>
+      <h1 style="margin-top:10px">Grab your <span class="gradient-text">seat</span><br>before it's gone.</h1>
+      <p class="lead">Register in seconds. A cryptographically signed QR ticket lands in your inbox right away. Show it at the door and you're in.</p>
+      <div class="hero-pills" id="heroPills"></div>
+    </div>
+  </section>
+
+  <div class="container">
+    <div class="filterbar">
+      <div class="chips" id="chips" role="group" aria-label="Filter by category"></div>
+      <label class="search"><span class="sr-only">Search events</span><span id="searchIcon"></span><input type="search" id="search" placeholder="Search events, venues…" autocomplete="off"></label>
+    </div>
+
+    <div id="events" class="grid" aria-live="polite">
+      <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
+    </div>
+
+    <section class="steps" aria-label="How it works">
+      <div class="card step"><div class="num">1</div><h3>Pick an event</h3><p class="muted small">Seats are capped at venue capacity. Once it's full, registration closes automatically.</p></div>
+      <div class="card step"><div class="num">2</div><h3>Get your QR ticket</h3><p class="muted small">We email you a unique, HMAC-signed QR code within seconds. Forgeries don't scan.</p></div>
+      <div class="card step"><div class="num">3</div><h3>Scan at the door</h3><p class="muted small">Organizers scan it once. Reused codes are flagged with the original check-in time.</p></div>
+    </section>
+  </div>
+</main>
+
+<script src="/js/common.js"></script>
+<script>
+(async function () {
+  const { $, esc, fmtDate, api, capacityClass, catSlug, catIcon, icons, mount, monthShort, dayNum } = CE;
+  mount('events');
+  $('#searchIcon').innerHTML = icons.search;
+
+  const grid = $('#events');
+  let events = [];
+  let activeCat = 'all';
+  let query = '';
+
+  function statusChip(ev) {
+    if (ev.soldOut) return '<span class="chip bad">Sold out</span>';
+    if (ev.remaining / ev.capacity <= 0.15) return `<span class="chip warn">${ev.remaining} left</span>`;
+    return '<span class="chip glass"><span class="dot"></span>Open</span>';
+  }
+
+  function card(ev, i) {
+    const pct = Math.min(100, Math.round((ev.registered / ev.capacity) * 100));
+    const seatsCls = ev.soldOut ? 'full' : (ev.remaining / ev.capacity <= 0.15 ? 'low' : '');
+    const seats = ev.soldOut ? 'Venue at capacity' : `${ev.remaining} of ${ev.capacity} seats left`;
+    return `
+      <a class="card event-card rise" data-cat="${catSlug(ev.category)}" href="/events/${ev.id}" style="animation-delay:${i * 60}ms" aria-label="${esc(ev.title)}">
+        <div class="cover">
+          <div class="date-badge"><div class="m">${esc(monthShort(ev.startsAt))}</div><div class="d">${dayNum(ev.startsAt)}</div></div>
+          ${statusChip(ev)}
+          <div class="glyph">${catIcon(ev.category)}</div>
+        </div>
+        <div class="body">
+          <div class="row-between" style="gap:8px">
+            <span class="chip cat">${esc(ev.category)}</span>
+            <span class="xs muted">${esc(fmtDate(ev.startsAt, { hour: 'numeric', minute: '2-digit' }))}</span>
+          </div>
+          <h3>${esc(ev.title)}</h3>
+          <p class="desc">${esc(ev.description)}</p>
+          <div class="meta">
+            <span>${icons.cal} ${esc(fmtDate(ev.startsAt, { weekday: 'long', month: 'long', day: 'numeric' }))}</span>
+            <span>${icons.pin} ${esc(ev.venue)}</span>
+          </div>
+          <div class="capacity">
+            <div class="bar ${capacityClass(ev)}"><i style="width:${pct}%"></i></div>
+          </div>
+          <div class="foot">
+            <span class="seats ${seatsCls}">${seats}</span>
+            ${ev.soldOut ? '<span class="btn sm" aria-disabled="true" style="opacity:.6">Full</span>' : `<span class="btn sm primary">Register ${icons.arrow}</span>`}
+          </div>
+        </div>
+      </a>`;
+  }
+
+  function render() {
+    const q = query.trim().toLowerCase();
+    const list = events.filter((e) =>
+      (activeCat === 'all' || catSlug(e.category) === activeCat) &&
+      (!q || `${e.title} ${e.venue} ${e.description} ${e.category}`.toLowerCase().includes(q))
+    );
+    grid.innerHTML = list.length
+      ? list.map(card).join('')
+      : `<div class="empty" style="grid-column:1/-1">No events match. Try another category or search term.</div>`;
+  }
+
+  function renderChips() {
+    const cats = [...new Set(events.map((e) => e.category))];
+    const chips = [['all', 'All events'], ...cats.map((c) => [catSlug(c), c])];
+    $('#chips').innerHTML = chips.map(([k, label]) => `<button class="chip-btn" type="button" data-cat="${k}" aria-pressed="${k === activeCat}">${esc(label)}</button>`).join('');
+    CE.$$('#chips .chip-btn').forEach((b) => b.addEventListener('click', () => {
+      activeCat = b.dataset.cat;
+      CE.$$('#chips .chip-btn').forEach((x) => x.setAttribute('aria-pressed', x === b));
+      render();
+    }));
+  }
+
+  function renderPills() {
+    const open = events.filter((e) => !e.soldOut).length;
+    const seats = events.reduce((a, e) => a + e.remaining, 0);
+    const next = events.find((e) => new Date(e.startsAt) >= Date.now());
+    $('#heroPills').innerHTML = `
+      <span class="pill"><span class="dot"></span><b>${open}</b> events open</span>
+      <span class="pill"><b>${seats.toLocaleString()}</b> seats available</span>
+      ${next ? `<span class="pill">Next up: <b>${esc(next.title)}</b> · ${esc(fmtDate(next.startsAt, { month: 'short', day: 'numeric' }))}</span>` : ''}`;
+  }
+
+  $('#search').addEventListener('input', (e) => { query = e.target.value; render(); });
+
+  try {
+    events = await api('GET', '/api/events');
+    renderPills();
+    renderChips();
+    render();
+  } catch (err) {
+    grid.innerHTML = `<div class="alert bad" style="grid-column:1/-1">${icons.warn}<div>Could not load events: ${esc(err.message)}</div></div>`;
+  }
+})();
+</script>
+</body>
+</html>

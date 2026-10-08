@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>You're registered — Campus Events</title>
+<script>(function(){try{var t=localStorage.getItem('ce.theme');if(t)document.documentElement.dataset.theme=t;else if(matchMedia('(prefers-color-scheme: dark)').matches)document.documentElement.dataset.theme='dark';}catch(e){}})();</script>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Cpath d='M8 12a2 2 0 0 0 2-2V9h12v1a2 2 0 0 0 0 4v2a2 2 0 0 0 0 4v1H10v-1a2 2 0 0 0-2-2z' fill='none' stroke='white' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+<main>
+  <div class="narrow" style="padding-top:32px">
+    <div id="view"><div class="skeleton" style="min-height:320px"></div></div>
+  </div>
+</main>
+
+<script src="/js/common.js"></script>
+<script>
+(async function () {
+  const { $, esc, fmtFull, api, icons, mount, catSlug } = CE;
+  mount('events');
+  const ticketId = decodeURIComponent(location.pathname.split('/').filter(Boolean).pop());
+  const view = $('#view');
+
+  function mailStatus(t) {
+    const d = t.email_delivery || {};
+    if (d.status === 'sent') {
+      return `
+        <div class="card mailcard rise" style="animation-delay:120ms">
+          <div class="ico">${icons.mail}</div>
+          <div>
+            <h3>Ticket emailed to ${esc(t.email)}</h3>
+            <p class="muted small" style="margin-top:4px">Subject line: “Your ticket for ${esc(t.event.title)}”. Give it a minute and check spam if it hasn't arrived.</p>
+            ${d.previewUrl ? `<div class="alert info" style="margin-top:12px">${icons.info}<div><strong>Developer mode.</strong> This server sends through an Ethereal test inbox, so the message didn't reach a real mailbox. <a href="${esc(d.previewUrl)}" target="_blank" rel="noopener">Open the email preview &rarr;</a></div></div>` : ''}
+          </div>
+        </div>`;
+    }
+    if (d.status === 'skipped') {
+      return `<div class="alert warn rise" style="animation-delay:120ms">${icons.info}<div><strong>Email sending is disabled on this server.</strong> Your seat is reserved. Use the ticket page below to show your QR code at the door.</div></div>`;
+    }
+    return `<div class="alert bad rise" style="animation-delay:120ms">${icons.warn}<div><strong>We couldn't send the email</strong> (${esc(d.error || 'unknown error')}). Your seat is reserved and your ticket page below still works.</div></div>`;
+  }
+
+  try {
+    const t = await api('GET', `/api/tickets/${encodeURIComponent(ticketId)}`);
+    view.innerHTML = `
+      <div class="success-head rise">
+        <div class="check-ring">${icons.check}</div>
+        <div class="eyebrow">Registration confirmed</div>
+        <h1 style="font-size:clamp(28px,4.5vw,42px);margin-top:8px">You're in, ${esc(t.name.split(' ')[0])}!</h1>
+        <p class="text-2" style="margin-top:10px;font-size:16px">Your seat at <strong>${esc(t.event.title)}</strong> is reserved for ${esc(fmtFull(t.event.startsAt))}.</p>
+      </div>
+      <div class="stack" style="margin-top:28px">
+        ${mailStatus(t)}
+        <div class="card center rise" style="animation-delay:200ms" data-cat="${catSlug(t.event.category)}">
+          <div class="qr-frame"><img src="/api/tickets/${encodeURIComponent(t.id)}/qr.png?size=320" width="200" height="200" alt="Your ticket QR code"></div>
+          <p class="muted small" style="margin-top:14px">Ticket ID <span class="mono">${esc(t.id)}</span></p>
+          <div class="row" style="justify-content:center;gap:10px;margin-top:16px">
+            <a class="btn primary" href="/ticket/${encodeURIComponent(t.id)}">${icons.ticket} Open my ticket</a>
+            <a class="btn" href="/">Browse more events</a>
+          </div>
+        </div>
+      </div>`;
+  } catch (err) {
+    view.innerHTML = `<div class="card center" style="padding:48px"><h2>Ticket not found</h2><p class="muted" style="margin:8px 0 18px">${esc(err.message)}</p><a class="btn" href="/">Back to events</a></div>`;
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Your ticket — Campus Events</title>
+<script>(function(){try{var t=localStorage.getItem('ce.theme');if(t)document.documentElement.dataset.theme=t;else if(matchMedia('(prefers-color-scheme: dark)').matches)document.documentElement.dataset.theme='dark';}catch(e){}})();</script>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Cpath d='M8 12a2 2 0 0 0 2-2V9h12v1a2 2 0 0 0 0 4v2a2 2 0 0 0 0 4v1H10v-1a2 2 0 0 0-2-2z' fill='none' stroke='white' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+<main>
+  <div class="container" style="max-width:900px;padding-top:24px">
+    <div class="row-between no-print" style="margin-bottom:16px">
+      <a href="/" class="muted small">&larr; All events</a>
+      <div class="row" id="actions" style="gap:8px"></div>
+    </div>
+    <div id="view"><div class="skeleton" style="min-height:360px"></div></div>
+  </div>
+</main>
+
+<script src="/js/common.js"></script>
+<script>
+(async function () {
+  const { $, esc, fmtDay, fmtClock, fmtDate, api, toast, icons, mount, catSlug } = CE;
+  mount('events');
+  const ticketId = decodeURIComponent(location.pathname.split('/').filter(Boolean).pop());
+  const view = $('#view');
+
+  try {
+    const t = await api('GET', `/api/tickets/${encodeURIComponent(ticketId)}`);
+    document.title = `Ticket · ${t.event.title} — Campus Events`;
+    const used = t.status === 'CHECKED_IN';
+
+    $('#actions').innerHTML = `
+      <button class="btn sm" id="copyBtn" type="button">${icons.copy} Copy code</button>
+      <button class="btn sm" type="button" onclick="window.print()">${icons.print} Print</button>`;
+
+    view.innerHTML = `
+      <article class="pass rise" data-cat="${catSlug(t.event.category)}">
+        ${used ? '<div class="ribbon used">Checked in</div>' : ''}
+        <div class="main">
+          <div class="strip">
+            <div class="eyebrow">${esc(t.event.category)} · Admit one</div>
+            <h2>${esc(t.event.title)}</h2>
+            <div class="when">${esc(fmtDay(t.event.startsAt))} · ${esc(fmtClock(t.event.startsAt))}</div>
+          </div>
+          <div class="details">
+            <div class="f"><div class="l">Attendee</div><div class="v">${esc(t.name)}</div></div>
+            <div class="f"><div class="l">Email</div><div class="v" style="font-weight:600">${esc(t.email)}</div></div>
+            ${t.studentId ? `<div class="f"><div class="l">Student ID</div><div class="v mono">${esc(t.studentId)}</div></div>` : ''}
+            <div class="f"><div class="l">Venue</div><div class="v">${esc(t.event.venue)}</div></div>
+            <div class="f wide"><div class="l">Status</div><div class="v">${used
+              ? `<span class="chip warn">${icons.check} Checked in · ${esc(fmtDate(t.checkedInAt))}</span>`
+              : `<span class="chip ok"><span class="dot"></span>Valid · not yet scanned</span>`}</div></div>
+            <div class="f wide muted small" style="margin-top:-6px">Show the QR at the door. It's signed and can only be used once; screenshots work fine.</div>
+          </div>
+        </div>
+        <div class="stub">
+          <div class="scanme">Scan at entry</div>
+          <div class="qr"><img src="/api/tickets/${encodeURIComponent(t.id)}/qr.png?size=464" alt="Ticket QR code"></div>
+          <div class="tid">${esc(t.id)}</div>
+        </div>
+      </article>
+
+      <details class="no-print" style="margin-top:18px">
+        <summary class="muted small" style="cursor:pointer">Can't scan? Show the organizer this code for manual entry</summary>
+        <div class="token-box" style="margin-top:10px">${esc(t.token)}</div>
+      </details>`;
+
+    $('#copyBtn').addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(t.token); toast('Ticket code copied'); }
+      catch { toast('Copy failed — expand the code below and copy it manually'); }
+    });
+  } catch (err) {
+    view.innerHTML = `<div class="card center" style="padding:48px"><h2>Ticket not found</h2><p class="muted" style="margin:8px 0 18px">${esc(err.message)}</p><a class="btn" href="/">Back to events</a></div>`;
+  }
+})();
+</script>
+</body>
+</html>

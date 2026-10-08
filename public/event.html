@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Register — Campus Events</title>
+<script>(function(){try{var t=localStorage.getItem('ce.theme');if(t)document.documentElement.dataset.theme=t;else if(matchMedia('(prefers-color-scheme: dark)').matches)document.documentElement.dataset.theme='dark';}catch(e){}})();</script>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Cpath d='M8 12a2 2 0 0 0 2-2V9h12v1a2 2 0 0 0 0 4v2a2 2 0 0 0 0 4v1H10v-1a2 2 0 0 0-2-2z' fill='none' stroke='white' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+<main>
+  <div class="container" style="padding-top:24px">
+    <p class="small" style="margin-bottom:16px"><a href="/" class="muted">&larr; All events</a></p>
+    <div id="view"><div class="skeleton" style="min-height:320px"></div></div>
+  </div>
+</main>
+
+<script src="/js/common.js"></script>
+<script>
+(async function () {
+  const { $, esc, fmtDay, fmtClock, api, capacityClass, catSlug, catIcon, icons, mount } = CE;
+  mount('events');
+
+  const id = Number(location.pathname.split('/').filter(Boolean).pop());
+  const view = $('#view');
+
+  function render(ev) {
+    const pct = Math.min(100, Math.round((ev.registered / ev.capacity) * 100));
+    document.title = `${ev.title} — Campus Events`;
+    const status = ev.soldOut ? '<span class="chip bad">Sold out</span>' : (ev.remaining / ev.capacity <= 0.15 ? `<span class="chip warn">Only ${ev.remaining} left</span>` : '<span class="chip glass"><span class="dot"></span>Registration open</span>');
+
+    view.innerHTML = `
+      <section class="banner rise" data-cat="${catSlug(ev.category)}">
+        <div class="glyph">${catIcon(ev.category)}</div>
+        <div class="top"><span class="chip glass">${esc(ev.category)}</span>${status}</div>
+        <h1>${esc(ev.title)}</h1>
+        <div class="sub">
+          <span>${icons.cal} ${esc(fmtDay(ev.startsAt))}</span>
+          <span>${icons.clock} ${esc(fmtClock(ev.startsAt))}</span>
+          <span>${icons.pin} ${esc(ev.venue)}</span>
+        </div>
+      </section>
+
+      <div class="detail-grid">
+        <section class="stack rise" style="animation-delay:80ms" data-cat="${catSlug(ev.category)}">
+          <div class="tiles">
+            <div class="tile"><div class="l">${icons.cal} When</div><div class="v">${esc(fmtDay(ev.startsAt))}</div><div class="s">${esc(fmtClock(ev.startsAt))}</div></div>
+            <div class="tile"><div class="l">${icons.pin} Where</div><div class="v">${esc(ev.venue)}</div><div class="s">On campus</div></div>
+            <div class="tile"><div class="l">${icons.users} Seats</div><div class="v">${ev.soldOut ? 'Full' : `${ev.remaining} left`}</div><div class="s">of ${ev.capacity} · ${pct}% booked</div></div>
+          </div>
+          <div class="capacity"><div class="bar ${capacityClass(ev)}"><i style="width:${pct}%"></i></div><div class="row"><span>${ev.registered} registered</span><span>Capacity ${ev.capacity}</span></div></div>
+          <div class="card">
+            <h2 style="font-size:20px;margin-bottom:10px">About this event</h2>
+            <p class="prose">${esc(ev.description)}</p>
+            <div class="divider"></div>
+            <div class="stack" style="gap:10px">
+              <div class="row" style="gap:10px"><span class="chip brand">${icons.qr} Signed QR ticket</span><span class="chip">${icons.mail} Emailed instantly</span><span class="chip">${icons.check} One scan per ticket</span></div>
+              <p class="muted small">Your ticket is personal and single-use. If you can't make it, just don't check in; there's nothing to cancel.</p>
+            </div>
+          </div>
+        </section>
+
+        <aside class="sticky rise" style="animation-delay:140ms">
+          <section class="card reg-card">
+            <div class="eyebrow" style="margin-bottom:6px">${ev.soldOut ? 'Registration closed' : 'Free registration'}</div>
+            <h2>${ev.soldOut ? 'This event is full' : 'Reserve your seat'}</h2>
+            <p class="muted small" style="margin:8px 0 18px">${ev.soldOut ? `All ${ev.capacity} seats at ${esc(ev.title)} are taken. New registrations are rejected automatically.` : 'We’ll email your QR ticket the moment you submit.'}</p>
+            <div id="formAlert"></div>
+            ${ev.soldOut ? `<a class="btn block lg" href="/">Browse other events</a>` : `
+            <form id="regForm" novalidate>
+              <div class="field" data-field="name">
+                <label for="name">Full name</label>
+                <input id="name" name="name" type="text" autocomplete="name" required maxlength="80" placeholder="Priya Sharma">
+                <div class="error"></div>
+              </div>
+              <div class="field" data-field="email">
+                <label for="email">Email</label>
+                <input id="email" name="email" type="email" autocomplete="email" required maxlength="254" placeholder="you@campus.edu">
+                <div class="hint">Your QR ticket goes here. One ticket per email.</div>
+                <div class="error"></div>
+              </div>
+              <div class="field" data-field="studentId">
+                <label for="studentId">Student ID <span class="muted" style="font-weight:500">(optional)</span></label>
+                <input id="studentId" name="studentId" type="text" maxlength="32" placeholder="2023CS1042">
+                <div class="error"></div>
+              </div>
+              <button class="btn primary block lg" id="submitBtn" type="submit">Get my ticket ${icons.arrow}</button>
+              <p class="muted xs center" style="margin-top:12px">${ev.remaining} seat${ev.remaining === 1 ? '' : 's'} remaining</p>
+            </form>`}
+          </section>
+        </aside>
+      </div>`;
+
+    const form = $('#regForm');
+    if (!form) return;
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const alertBox = $('#formAlert');
+      alertBox.innerHTML = '';
+      CE.$$('.field').forEach((f) => f.classList.remove('invalid'));
+
+      const payload = { name: form.name.value.trim(), email: form.email.value.trim(), studentId: form.studentId.value.trim() };
+      let bad = false;
+      const mark = (field, msg) => { const f = $(`.field[data-field="${field}"]`); if (!f) return; f.classList.add('invalid'); f.querySelector('.error').textContent = msg; bad = true; };
+      if (payload.name.length < 2) mark('name', 'Please enter your full name.');
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(payload.email)) mark('email', 'Please enter a valid email address.');
+      if (bad) return;
+
+      const btn = $('#submitBtn');
+      btn.disabled = true;
+      btn.innerHTML = 'Reserving your seat…';
+      try {
+        const res = await api('POST', `/api/events/${id}/register`, payload);
+        btn.innerHTML = `${icons.check} Ticket sent! Redirecting…`;
+        location.href = `/success/${encodeURIComponent(res.ticketId)}`;
+      } catch (err) {
+        btn.disabled = false;
+        btn.innerHTML = `Get my ticket ${icons.arrow}`;
+        const body = err.body || {};
+        if (body.error === 'VALIDATION' && body.field) mark(body.field, body.message);
+        else if (body.error === 'SOLD_OUT') { alertBox.innerHTML = `<div class="alert bad">${icons.warn}<div><strong>Sorry, that was the last seat.</strong> ${esc(body.message)}</div></div>`; setTimeout(load, 1800); }
+        else if (body.error === 'DUPLICATE') alertBox.innerHTML = `<div class="alert warn">${icons.info}<div>${esc(body.message)}</div></div>`;
+        else alertBox.innerHTML = `<div class="alert bad">${icons.warn}<div>${esc(err.message)}</div></div>`;
+      }
+    });
+  }
+
+  async function load() {
+    try { render(await api('GET', `/api/events/${id}`)); }
+    catch (err) { view.innerHTML = `<div class="card center" style="padding:48px"><h2>Event not found</h2><p class="muted" style="margin:8px 0 18px">${esc(err.message)}</p><a class="btn" href="/">Back to events</a></div>`; }
+  }
+  load();
+})();
+</script>
+</body>
+</html>
