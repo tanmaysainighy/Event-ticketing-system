@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Organizer Check-In — Campus Events</title>
+<script>(function(){try{var t=localStorage.getItem('ce.theme');if(t)document.documentElement.dataset.theme=t;else if(matchMedia('(prefers-color-scheme: dark)').matches)document.documentElement.dataset.theme='dark';}catch(e){}})();</script>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Cpath d='M8 12a2 2 0 0 0 2-2V9h12v1a2 2 0 0 0 0 4v2a2 2 0 0 0 0 4v1H10v-1a2 2 0 0 0-2-2z' fill='none' stroke='white' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+<main>
+  <div class="container">
+
+    <!-- Key gate -->
+    <section id="gate" class="narrow" hidden style="padding-top:56px">
+      <div class="card rise" style="padding:32px">
+        <div class="stat-ico" style="width:48px;height:48px;border-radius:14px;display:grid;place-items:center;background:var(--brand-soft);color:var(--brand);margin-bottom:18px" id="gateIcon"></div>
+        <div class="eyebrow">Organizer portal</div>
+        <h2 style="margin-top:6px">Enter the organizer key</h2>
+        <p class="muted small" style="margin:8px 0 20px">Set with <span class="mono">ORGANIZER_KEY</span> on the server. The key is kept in this tab only.</p>
+        <form id="gateForm">
+          <div class="field">
+            <label for="key">Organizer key</label>
+            <input id="key" type="password" autocomplete="current-password" required placeholder="••••••••••">
+          </div>
+          <div id="gateError" class="alert bad" hidden style="margin-bottom:14px"></div>
+          <button class="btn primary block lg" type="submit">Open check-in portal</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- Portal -->
+    <section id="portal" hidden>
+      <div class="org-top">
+        <div>
+          <div class="eyebrow">Organizer portal</div>
+          <h1 style="margin-top:6px">Door check-in</h1>
+        </div>
+        <div class="toolbar">
+          <span id="liveChip" class="chip">Connecting…</span>
+          <select id="eventSelect" aria-label="Event to scan for"></select>
+          <button class="btn sm" id="logoutBtn" type="button" title="Lock portal"></button>
+        </div>
+      </div>
+
+      <div class="stats">
+        <div class="card stat">
+          <div class="ring">
+            <svg viewBox="0 0 60 60"><defs><linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4f46e5"/><stop offset="1" stop-color="#ec4899"/></linearGradient></defs><circle class="track" cx="30" cy="30" r="26"/><circle class="fill" id="ringFill" cx="30" cy="30" r="26"/></svg>
+            <div class="pct" id="ringPct">0%</div>
+          </div>
+          <div><div class="n" id="stChecked">–</div><div class="l">Checked in</div></div>
+        </div>
+        <div class="card stat"><div class="ico" id="icoReg"></div><div><div class="n" id="stRegistered">–</div><div class="l">Registered</div></div></div>
+        <div class="card stat"><div class="ico" id="icoWait"></div><div><div class="n" id="stRemaining">–</div><div class="l">Yet to arrive</div></div></div>
+        <div class="card stat"><div class="ico" id="icoRej"></div><div><div class="n" id="stRejected">–</div><div class="l">Rejected scans</div></div></div>
+      </div>
+
+      <div id="result" class="result idle" role="status" aria-live="assertive">
+        <div>
+          <div style="font-weight:700;color:var(--text-2);font-size:16px">Waiting for a scan</div>
+          <div class="sub">Verdicts appear here instantly: <strong style="color:var(--ok)">CHECKED-IN</strong>, <strong style="color:var(--warn)">ALREADY USED</strong> or <strong style="color:var(--bad)">INVALID TICKET</strong>.</div>
+        </div>
+      </div>
+
+      <div class="org-grid">
+        <div class="stack">
+          <div class="card">
+            <div class="row-between" style="margin-bottom:14px">
+              <div><h3>Camera scanner</h3><p class="muted small" id="eventHint"></p></div>
+              <div class="row" style="gap:8px">
+                <button class="btn sm primary" id="startBtn" type="button"></button>
+                <button class="btn sm" id="stopBtn" type="button" hidden>Stop</button>
+              </div>
+            </div>
+            <div id="camAlert" style="margin-bottom:12px"></div>
+            <div class="viewfinder" id="viewfinder">
+              <div id="reader"></div>
+              <div class="corners"><i></i></div>
+              <div class="scanline"></div>
+              <div class="idle-msg"><div><span id="camIcon"></span>Start the camera and point it at a ticket QR code.</div></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Manual entry</h3>
+            <p class="muted small" style="margin:4px 0 12px">Paste the ticket code from the email or ticket page if the camera can't read it.</p>
+            <form id="manualForm">
+              <textarea id="manualToken" placeholder="EVT1.eyJ0aWQiOi…" spellcheck="false" aria-label="Ticket code"></textarea>
+              <div class="row" style="gap:8px;margin-top:12px">
+                <button class="btn primary" type="submit">Verify ticket</button>
+                <button class="btn ghost" type="button" id="clearBtn">Clear</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <div class="stack">
+          <div class="card">
+            <div class="row-between" style="margin-bottom:12px">
+              <h3>Live feed</h3>
+              <span class="small muted" id="feedCount"></span>
+            </div>
+            <ul id="feed" class="feed"><li class="empty">No scans yet.</li></ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:22px">
+        <div class="row-between" style="margin-bottom:12px">
+          <h3>Attendees</h3>
+          <div class="row" style="gap:8px">
+            <label class="search" style="min-width:200px;flex:0 1 260px"><span class="sr-only">Filter attendees</span><span id="attSearchIcon"></span><input type="search" id="attSearch" placeholder="Filter by name or email" style="height:38px"></label>
+            <button class="btn sm" id="refreshAtt" type="button">Refresh</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="att">
+            <thead><tr><th>Attendee</th><th>Email</th><th>Student ID</th><th>Status</th><th>Checked in</th></tr></thead>
+            <tbody id="attBody"><tr><td colspan="5" class="muted">Select an event to see attendees.</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="/js/common.js"></script>
+<script>
+(function () {
+  const { $, esc, fmtTime, fmtDate, api, toast, icons, mount, initials } = CE;
+  mount('organizer');
+  $('#gateIcon').innerHTML = icons.lock;
+  $('#icoReg').innerHTML = icons.users;
+  $('#icoWait').innerHTML = icons.clock;
+  $('#icoRej').innerHTML = icons.x;
+  $('#camIcon').innerHTML = icons.camera;
+  $('#attSearchIcon').innerHTML = icons.search;
+  $('#startBtn').innerHTML = `${icons.camera} Start camera`;
+  $('#logoutBtn').innerHTML = `${icons.lock} Lock`;
+
+  const KEY_STORE = 'ce.organizerKey';
+  let key = sessionStorage.getItem(KEY_STORE) || '';
+  let events = [];
+  let selectedEventId = null;
+  let realtime = 'poll';
+  let es = null;
+  let pollTimer = null;
+  let scanner = null;
+  let busy = false;
+  let lastToken = '';
+  let lastAt = 0;
+  let attendees = [];
+  let rejectedCount = 0;
+  const seenScans = new Set();
+
+  const H = () => ({ 'x-organizer-key': key });
+
+  // ---------- Gate ----------
+  async function tryEnter() {
+    if (!key) return showGate();
+    try {
+      const r = await api('POST', '/api/organizer/login', {}, H());
+      realtime = r.realtime || 'poll';
+      sessionStorage.setItem(KEY_STORE, key);
+      await showPortal();
+    } catch (err) {
+      key = '';
+      sessionStorage.removeItem(KEY_STORE);
+      showGate(err.status === 401 ? 'That key is not correct.' : err.message);
+    }
+  }
+  function showGate(msg) {
+    $('#portal').hidden = true;
+    $('#gate').hidden = false;
+    const e = $('#gateError');
+    e.hidden = !msg; e.innerHTML = msg ? `${icons.warn}<div>${esc(msg)}</div>` : '';
+    $('#key').focus();
+  }
+  $('#gateForm').addEventListener('submit', (e) => { e.preventDefault(); key = $('#key').value.trim(); tryEnter(); });
+  $('#logoutBtn').addEventListener('click', () => { key = ''; sessionStorage.removeItem(KEY_STORE); stopCamera(); if (es) es.close(); clearInterval(pollTimer); location.reload(); });
+
+  // ---------- Portal ----------
+  async function showPortal() {
+    $('#gate').hidden = true;
+    $('#portal').hidden = false;
+    await loadEvents();
+    await refreshFeed(false);
+    startRealtime();
+    if (!window.isSecureContext) {
+      $('#camAlert').innerHTML = `<div class="alert warn">${icons.warn}<div>Camera access needs HTTPS or localhost. Manual entry still works.</div></div>`;
+    }
+  }
+
+  async function loadEvents() {
+    events = await api('GET', '/api/organizer/events', undefined, H());
+    const sel = $('#eventSelect');
+    const prev = selectedEventId;
+    sel.innerHTML = '<option value="">Any event (no filter)</option>' +
+      events.map((e) => `<option value="${e.id}">${esc(e.title)} · ${esc(fmtDate(e.startsAt, { month: 'short', day: 'numeric' }))}</option>`).join('');
+    if (prev == null) {
+      const upcoming = events.find((e) => new Date(e.startsAt) >= Date.now()) || events[0];
+      selectedEventId = upcoming ? upcoming.id : null;
+    }
+    sel.value = selectedEventId ?? '';
+    renderStats();
+    await loadAttendees();
+  }
+  $('#eventSelect').addEventListener('change', async (e) => {
+    selectedEventId = e.target.value ? Number(e.target.value) : null;
+    seenScans.clear();
+    renderStats();
+    await Promise.all([loadAttendees(), refreshFeed(false)]);
+  });
+
+  const currentEvent = () => events.find((e) => e.id === selectedEventId) || null;
+
+  function renderStats() {
+    const ev = currentEvent();
+    const reg = ev ? ev.registered : events.reduce((a, e) => a + e.registered, 0);
+    const chk = ev ? ev.checkedIn : events.reduce((a, e) => a + e.checkedIn, 0);
+    const pct = reg ? Math.round((chk / reg) * 100) : 0;
+    $('#stRegistered').textContent = ev ? `${reg}/${ev.capacity}` : reg;
+    $('#stChecked').textContent = chk;
+    $('#stRemaining').textContent = Math.max(0, reg - chk);
+    $('#stRejected').textContent = rejectedCount;
+    $('#ringPct').textContent = `${pct}%`;
+    $('#ringFill').style.strokeDashoffset = String(164 - (164 * pct) / 100);
+    $('#eventHint').textContent = ev ? `Scanning for ${ev.title}. Other events' tickets are rejected.` : 'Any valid ticket is accepted.';
+  }
+
+  async function loadAttendees() {
+    const body = $('#attBody');
+    if (!selectedEventId) { attendees = []; body.innerHTML = '<tr><td colspan="5" class="muted">Select an event to see attendees.</td></tr>'; return; }
+    try {
+      attendees = await api('GET', `/api/organizer/attendees?eventId=${selectedEventId}`, undefined, H());
+      renderAttendees();
+    } catch (err) {
+      body.innerHTML = `<tr><td colspan="5"><div class="alert bad">${icons.warn}<div>${esc(err.message)}</div></div></td></tr>`;
+    }
+  }
+  function renderAttendees() {
+    const q = $('#attSearch').value.trim().toLowerCase();
+    const rows = attendees.filter((r) => !q || `${r.name} ${r.email} ${r.studentId || ''}`.toLowerCase().includes(q));
+    $('#attBody').innerHTML = rows.length ? rows.map((r) => `
+      <tr>
+        <td><span class="avatar">${esc(initials(r.name))}</span><strong>${esc(r.name)}</strong></td>
+        <td class="muted">${esc(r.email)}</td>
+        <td class="mono small">${esc(r.studentId || '—')}</td>
+        <td>${r.status === 'CHECKED_IN' ? `<span class="chip ok">${icons.check} Checked in</span>` : '<span class="chip">Registered</span>'}</td>
+        <td class="muted small">${r.checkedInAt ? esc(fmtDate(r.checkedInAt)) : '—'}</td>
+      </tr>`).join('') : `<tr><td colspan="5" class="muted">${q ? 'No attendees match that filter.' : 'No registrations yet.'}</td></tr>`;
+  }
+  $('#attSearch').addEventListener('input', renderAttendees);
+  $('#refreshAtt').addEventListener('click', () => refreshAll());
+
+  // ---------- Realtime: SSE when available, polling always as a safety net ----------
+  function startRealtime() {
+    const chip = $('#liveChip');
+    if (realtime === 'sse' && 'EventSource' in window) {
+      es = new EventSource(`/api/organizer/stream?key=${encodeURIComponent(key)}`);
+      es.onopen = () => { chip.innerHTML = '<span class="dot"></span>Live'; chip.className = 'chip ok live'; };
+      es.onerror = () => { chip.textContent = 'Reconnecting…'; chip.className = 'chip warn'; };
+      es.addEventListener('scan', () => refreshAll());
+      es.addEventListener('registration', (e) => { const d = JSON.parse(e.data); toast(`New registration: ${d.name}`); refreshAll(); });
+    } else {
+      chip.innerHTML = '<span class="dot"></span>Auto-refresh';
+      chip.className = 'chip ok live';
+    }
+    clearInterval(pollTimer);
+    pollTimer = setInterval(() => { if (!document.hidden) refreshAll(); }, realtime === 'sse' ? 15000 : 4000);
+  }
+
+  let refreshing = false;
+  async function refreshAll() {
+    if (refreshing) return;
+    refreshing = true;
+    try {
+      const [evs] = await Promise.all([
+        api('GET', '/api/organizer/events', undefined, H()),
+        refreshFeed(true),
+        selectedEventId ? loadAttendees() : Promise.resolve(),
+      ]);
+      events = evs;
+      renderStats();
+    } catch (err) {
+      if (err.status === 401) { showGate('Session expired.'); }
+    } finally { refreshing = false; }
+  }
+
+  const feedMeta = {
+    CHECKED_IN: ['ok', 'Checked in', icons.check],
+    ALREADY_USED: ['warn', 'Already used', icons.repeat],
+    INVALID: ['bad', 'Invalid', icons.x],
+  };
+  async function refreshFeed(animate) {
+    const rows = await api('GET', `/api/organizer/scans${selectedEventId ? `?eventId=${selectedEventId}` : ''}`, undefined, H());
+    rejectedCount = rows.filter((r) => r.status === 'INVALID').length;
+    $('#stRejected').textContent = rejectedCount;
+    const feed = $('#feed');
+    if (!rows.length) { feed.innerHTML = '<li class="empty">No scans yet.</li>'; $('#feedCount').textContent = ''; return; }
+    feed.innerHTML = rows.map((r) => {
+      const [cls, label, ic] = feedMeta[r.status] || ['', r.status, icons.info];
+      const who = r.attendeeName || r.reason || 'Unknown code';
+      const isNew = animate && !seenScans.has(r.id);
+      return `<li class="${cls} ${isNew ? 'new' : ''}"><span class="ic">${ic}</span><span class="who">${esc(who)}${r.eventTitle ? ` <span class="muted">· ${esc(r.eventTitle)}</span>` : ''}<span class="muted"> · ${label}</span></span><time>${esc(fmtTime(r.scannedAt))}</time></li>`;
+    }).join('');
+    rows.forEach((r) => seenScans.add(r.id));
+    $('#feedCount').textContent = `${rows.length} recent`;
+  }
+
+  // ---------- Verification ----------
+  function beep(kind) {
+    try {
+      const ctx = beep.ctx || (beep.ctx = new (window.AudioContext || window.webkitAudioContext)());
+      const tone = (freq, start, dur, type = 'sine', gain = 0.18) => {
+        const o = ctx.createOscillator(); const g = ctx.createGain();
+        o.type = type; o.frequency.value = freq; g.gain.value = gain;
+        o.connect(g).connect(ctx.destination);
+        o.start(ctx.currentTime + start); o.stop(ctx.currentTime + start + dur);
+      };
+      if (kind === 'ok') { tone(740, 0, 0.09); tone(1100, 0.09, 0.14); }
+      else if (kind === 'warn') { tone(520, 0, 0.1); tone(520, 0.16, 0.1); }
+      else tone(170, 0, 0.4, 'sawtooth', 0.12);
+    } catch { /* audio blocked */ }
+  }
+
+  function renderResult(r, source) {
+    const box = $('#result');
+    box.className = 'result';
+    void box.offsetWidth;
+    const when = fmtTime(r.scannedAt);
+    const who = r.attendee ? `${esc(r.attendee.name)}${r.attendee.email ? ` <span class="muted">· ${esc(r.attendee.email)}</span>` : ''}${r.attendee.studentId ? ` <span class="muted mono small">· ${esc(r.attendee.studentId)}</span>` : ''}` : '';
+    if (r.status === 'CHECKED_IN') {
+      box.className = 'result ok flash';
+      box.innerHTML = `<div class="ico">${icons.check}</div><div><div class="status">CHECKED-IN</div><div class="who">${who}</div><div class="sub">${esc(r.event?.title || '')} · ${esc(when)} · via ${source}</div></div>`;
+      beep('ok');
+    } else if (r.status === 'ALREADY_USED') {
+      box.className = 'result warn flash';
+      box.innerHTML = `<div class="ico">${icons.repeat}</div><div><div class="status">ALREADY USED</div><div class="who">${who}</div><div class="sub">First checked in <strong>${esc(fmtDate(r.checkedInAt, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit' }))}</strong> · this scan ${esc(when)} · via ${source}</div></div>`;
+      beep('warn');
+    } else {
+      box.className = 'result bad flash';
+      box.innerHTML = `<div class="ico">${icons.x}</div><div><div class="status">INVALID TICKET</div><div class="who">${esc(r.reason || 'This code could not be verified.')}</div><div class="sub">${who ? who + ' · ' : ''}${r.ticketId ? `ticket ${esc(r.ticketId)} · ` : ''}${esc(when)} · via ${source}</div></div>`;
+      beep('bad');
+    }
+  }
+
+  async function verify(token, source) {
+    if (busy) return;
+    busy = true;
+    try {
+      const r = await api('POST', '/api/organizer/verify', { token, eventId: selectedEventId || undefined }, H());
+      renderResult(r, source);
+      refreshAll();
+    } catch (err) {
+      if (err.status === 401) { toast('Organizer key rejected. Please sign in again.'); return showGate('Session expired.'); }
+      renderResult({ status: 'INVALID', reason: `Server error: ${err.message}`, scannedAt: new Date().toISOString() }, source);
+    } finally {
+      setTimeout(() => { busy = false; }, 400);
+    }
+  }
+
+  $('#manualForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const token = $('#manualToken').value.trim();
+    if (!token) return toast('Paste a ticket code first');
+    verify(token, 'manual entry');
+  });
+  $('#clearBtn').addEventListener('click', () => { $('#manualToken').value = ''; $('#manualToken').focus(); });
+
+  // ---------- Camera ----------
+  async function startCamera() {
+    if (typeof Html5Qrcode === 'undefined') {
+      $('#camAlert').innerHTML = `<div class="alert bad">${icons.warn}<div>The QR scanner library failed to load (offline?). Manual entry still works.</div></div>`;
+      return;
+    }
+    $('#camAlert').innerHTML = '';
+    $('#startBtn').disabled = true;
+    try {
+      scanner = scanner || new Html5Qrcode('reader', { verbose: false });
+      await scanner.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: (w, h) => { const s = Math.floor(Math.min(w, h) * 0.7); return { width: s, height: s }; } },
+        onDecoded,
+        () => {}
+      );
+      $('#viewfinder').classList.add('active');
+      $('#startBtn').hidden = true;
+      $('#stopBtn').hidden = false;
+    } catch (err) {
+      $('#camAlert').innerHTML = `<div class="alert bad">${icons.warn}<div><strong>Camera unavailable.</strong> ${esc(String(err?.message || err))}. Use manual entry below.</div></div>`;
+    } finally {
+      $('#startBtn').disabled = false;
+    }
+  }
+  async function stopCamera() {
+    if (scanner && scanner.isScanning) { try { await scanner.stop(); } catch { /* ignore */ } }
+    $('#viewfinder').classList.remove('active');
+    $('#startBtn').hidden = false;
+    $('#stopBtn').hidden = true;
+  }
+  async function onDecoded(text) {
+    const now = Date.now();
+    if (busy) return;
+    if (text === lastToken && now - lastAt < 4000) return;
+    lastToken = text; lastAt = now;
+    try { scanner.pause(true); } catch { /* ignore */ }
+    await verify(text, 'camera');
+    setTimeout(() => { try { scanner.resume(); } catch { /* ignore */ } }, 1800);
+  }
+  $('#startBtn').addEventListener('click', startCamera);
+  $('#stopBtn').addEventListener('click', stopCamera);
+  window.addEventListener('pagehide', stopCamera);
+
+  tryEnter();
+})();
+</script>
+</body>
+</html>
